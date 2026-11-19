@@ -1,2 +1,52 @@
-# Orbital-Maneuvers
-Satellite warfare game 
+# Orbital Command
+
+A shared-clock browser strategy game for one to four players. Guide a space programme from 1975 through a speculative future. The campaign ends in January 2060 after roughly 102 minutes at continuous 4× speed.
+
+## Host a campaign
+
+Requires Node.js 22 or newer. The game has no runtime package dependencies.
+
+```sh
+node server.mjs
+```
+
+The default address is `http://127.0.0.1:8787`. For a trusted LAN or private VPN, bind the service to an address your friends can reach.
+
+```sh
+HOST=0.0.0.0 PORT=8787 node server.mjs
+```
+
+Allow inbound TCP 8787 on the intended private network if the host firewall blocks it. For internet play, use a private overlay network or put an HTTPS reverse proxy in front of the local listener. With a public HTTPS proxy, direct port forwarding for the Node service is unnecessary. Share a link using the same hostname your friends can reach.
+
+The host creates a room, chooses the expected number of humans, and shares the invite. The campaign starts automatically when those players have picked distinct factions and marked themselves ready. Select one human for solo play. The remaining factions are AI-controlled. Everyone initially requests 4×. The lowest speed requested by a connected player becomes the shared speed, including pause. The campaign pauses when every player leaves and resumes when someone returns. Using the same browser profile and origin restores the seat. The server stores a hash of its private credential.
+
+The server saves each room and its pending game orders under `data/`, or under the directory specified by `DATA_DIR`. Keep this directory when upgrading or restarting. For development, `MONTH_MS` changes the wall-clock milliseconds per simulated month at 4×. The default is 6000.
+
+## Play
+
+- **Command** shows ground tracks, approximate instantaneous coverage, fleet condition, orbital hazards and global tension. Select a spacecraft to estimate transfers or adjust its orbital spacing.
+- **Spacecraft** assembles a reusable class from researched buses and modules. Drag equipment onto the blueprint slots or click the module after selecting a slot. Extra power, heat rejection, propellant and launch capacity compete for mass.
+- **Production & launch** handles manufacture, stock, launch queues and standing replenishment orders. Different orbits suit different services. Maintain backups before the initial fleet reaches retirement.
+- **Research** has 38 technologies across six branches, with cross-branch prerequisites and catch-up for projects demonstrated elsewhere. **Economy** controls programme funding, the ground network and debris remediation.
+- **Intelligence & events** exposes estimates rather than rival build details. Incidents provide opportunities to negotiate, deliver services, gather intelligence, or act against designated fictional crisis assets.
+- **Final assessment** combines delivered services, space-driven economic gains, crisis actions, resilience and stewardship. General orbital war depends on tension, capabilities and reliance on space services. The aftermath can close some orbits to new launches for years.
+
+## Simulation and sources
+
+Historical events include Apollo–Soyuz, Helsinki, Afghanistan, Challenger, the Gulf crisis and ISS assembly. Soviet succession depends on fiscal and orbital-service strength. The later disputes and the prospect of a general war are speculative game events. Credits and GDP effects are tuning values. Circular orbital presets use analytic motion, approximate transfers and statistical debris exposure. Coverage is a line-of-sight illustration. The service model also includes capacity, redundancy and ground support.
+
+- [NASA Apollo–Soyuz](https://www.nasa.gov/missions/apollo-soyuz/the-apollo-soyuz-mission/)
+- [Office of the Historian on détente](https://history.state.gov/milestones/1969-1976/detente), [Afghanistan](https://history.state.gov/milestones/1977-1980/soviet-invasion-afghanistan) and [Soviet succession](https://history.state.gov/milestones/1989-1992/collapse-soviet-union)
+- [NASA space history timeline](https://www.nasa.gov/specials/timeline/topics.html)
+- [NASA orbital elements](https://science.nasa.gov/learn/basics-of-space-flight/chapter5-1/) and [ESA debris models](https://www.sdo.esoc.esa.int/)
+- [Natural Earth 1:110m coastlines](https://www.naturalearthdata.com/downloads/110m-physical-vectors/110m-coastline/), distributed as [public-domain data](https://www.naturalearthdata.com/about/terms-of-use/)
+
+The design is Earth-focused. A later Moon expansion could introduce a competing use for launch capacity through relay coverage, science, and logistics for sustained surface operations. Its economic importance would depend on actual demand, transport cost and how much infrastructure each faction can keep operating.
+
+## Test
+
+```sh
+node --test
+```
+
+The suite covers research prerequisites, class constraints, production and replenishment, orbit and debris behaviour, faction-scoped information, historical divergence, war and recovery, deterministic saves, and the multiplayer lobby and clock.
