@@ -1,3 +1,4 @@
+import {customers,incidentCustomer,payloadProfile,assessFleet} from '/engine/missions.mjs';
 import { BANDS, BAND, BRANCHES, BUS, END, FACTIONS, PARTS, POLICIES, ROCKETS, SERVICES, SPEEDS, START, TECH } from '/engine/content.mjs';
 import { phasing, remainingDeltaV } from '/engine/orbit.mjs';
 import { coastReady, plot, schematic } from '/map.mjs';
@@ -20,7 +21,7 @@ const gauge=(label,percent,caption)=>`<div class="gauge"><div><span>${label}</sp
 const chip=(text,tint='')=>`<span class="chip ${tint}">${text}</span>`;
 const actionBtn=(title,type,data='',klass='',disabled=false)=>`<button type="button" class="${klass}" data-action="${type}" ${data} ${disabled?'disabled':''}>${title}</button>`;
 const stations=[['command','Command'],['design','Spacecraft'],['research','Research'],['launch','Production & launch'],['intelligence','Intelligence & events'],['economy','Economy']];
-const objectiveNames={services:'Civil services',economy:'Economic impact',intelligence:'Intelligence',operations:'Crisis operations',resilience:'Resilience',stewardship:'Stewardship'};
+const objectiveNames={readiness:'Military readiness',campaigns:'Conflict contribution',services:'Civil services',economy:'Economic impact',intelligence:'Intelligence',operations:'Crisis operations',resilience:'Resilience',stewardship:'Stewardship'};
 const invite=new URLSearchParams(location.search).get('room')?.toUpperCase();
 let session=null,room=null,tab='command',pending=false,polling=false,signature='',noticeTimer,mapHits=[],revision=0;
 let display={selected:null,band:'',layer:'tracks'};
@@ -125,7 +126,7 @@ function renderLobby() {
       <div class="faction-grid">${FACTIONS.map(f=>{
         const owner=room.players.find(p=>p.faction===f.id);
         return `<button type="button" class="faction-card ${owner?.id===room.player?'chosen':''}" style="--faction:${f.color}" data-action="faction" data-id="${f.id}" ${owner&&owner.id!==room.player?'disabled':''}>
-          <span class="faction-code">${f.short}</span><strong>${f.name}</strong><span>${f.site}</span><small>${owner?esc(owner.name)+(owner.ready?' / ready':' / claimed'):'Available'}</small></button>`;
+          <span class="faction-code">${f.short}</span><strong>${f.name}</strong><span>${f.site}</span><small>${{us:'Favourable · largest initial budget',su:'Competitive · nuclear radar, succession risk',eu:'Hard · industrial base and efficient production',cn:'Very hard · smallest economy'}[f.id]}</small><small>${owner?esc(owner.name)+(owner.ready?' / ready':' / claimed'):'Available'}</small></button>`;
       }).join('')}</div>
       <div class="briefing-actions"><div class="roster">${room.players.map(p=>`<span>${esc(p.name)} ${p.ready?'· READY':''} ${!p.online?'· OFFLINE':''} ${room.host&&!p.host?actionBtn('×','remove',`data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)}"`,'quiet'):''}</span>`).join('')}</div>
       <div class="button-row"><span class="subtle">${room.players.length} / ${room.expected} players</span>
@@ -160,7 +161,9 @@ function renderCommand(g,n) {
   const plan=sat?.transfers[filters.tacticalTransfer];
   const phasePlan=sat&&filters.phase?phasing(sat.orbit,filters.phase,sat.design.electric):null;
   $('map-footer').innerHTML=`<span><i class="legend own"></i> OWN SPACECRAFT</span><span><i class="legend"></i> FOREIGN CONTACT</span><span><i class="legend site"></i> LAUNCH SITE</span><span class="map-caption">EARTH FIXED / GROUND TRACKS</span>`;
-  $('command-side').innerHTML=panel('Service network',entries(n.services).map(([k,v])=>gauge(SERVICES[k],v*100,pct(v))).join('')+
+  $('command-side').innerHTML=panel('Military customer orders',entries(n.missions?.readiness??{}).map(([k,v])=>gauge(customers[k],v*100,pct(v))).join('')+
+    `<label>Tasking priority<select id="military-assignment">${opts({balanced:'Balanced allocation',...customers},n.assignment??'balanced')}</select></label>
+    <p class="subtle">Priority tasking concentrates support on one command and reduces the share available to the others.</p>`)+panel('Space services',entries(n.services).map(([k,v])=>gauge(SERVICES[k],v*100,pct(v))).join('')+
     `<div class="economy-pair"><div><span>GDP EFFECT</span><strong>+${(n.economicBonus*100).toFixed(1)}%</strong></div><div><span>RESILIENCE</span><strong>${pct(n.resilience)}</strong></div></div>`)+
     panel('Orbital environment',`<div class="tension-line">${gauge('Global tension',g.tension,Math.round(g.tension)+' / 100')}</div><div class="band-list"><button data-action="band" data-id="" class="${!display.band?'active':''}"><span>All orbital bands</span><span>YEARLY RISK</span></button>`+
     g.bands.map(b=>`<button class="${display.band===b.id?'active':''}" data-action="band" data-id="${b.id}"><span>${BAND[b.id].name}</span><b class="${b.annualRisk>2?'warning':''}">${b.annualRisk.toFixed(2)}%</b></button>`).join('')+'</div>')+
@@ -199,6 +202,9 @@ function designStats() {
 }
 function renderDesign(g,n) {
   const {design,errors}=designStats();
+  const sample={phase:0,node:0,band:'polar',condition:1,design:{payload:payloadProfile(build.slots)}};
+  const forecast=cloud=>assessFleet({...n,chartArchive:0},[sample],cloud,false);
+  const clear=forecast(.1),cloudy=forecast(.75);
   const categories=Object.fromEntries([...new Set(Object.values(PARTS).map(p=>p.kind))].map(k=>[k,k]));
   const filtered=entries(PARTS).filter(([,p])=>known(p)&&(build.category==='all'||p.kind===build.category));
   $('design').innerHTML=section('ENGINEERING','Spacecraft designer','Install researched equipment, verify the margins and save a reusable spacecraft class.')+
@@ -211,7 +217,7 @@ function renderDesign(g,n) {
     <p class="subtle">Drag a module into a slot or select a slot and click a module.</p>
     <div class="detail-stats design-stats"><div><span>WET MASS</span><b>${design.dryMass+(design.isp?design.fuel:0)} kg</b></div><div><span>POWER MARGIN</span><b class="${design.power<0?'warning':''}">${design.power}</b></div>
     <div><span>THERMAL MARGIN</span><b class="${design.heat<0?'warning':''}">${design.heat}</b></div><div><span>ΔV RESERVE</span><b>${num(remainingDeltaV(design,design.fuel))} m/s</b></div><div><span>UNIT COST</span><b>${design.cost} cr</b></div></div>
-    <div class="design-foot"><span class="${errors.length?'warning':'accent'}">${errors.join(' · ')||'Design passes engineering checks'}</span>${actionBtn('Save class','save-class','','primary',!!errors.length)}</div>`)+
+    <p class="subtle">Single-spacecraft polar survey estimate · clear ${pct(clear.imagery)} · cloudy ${pct(cloudy.imagery)} · chart support ${pct(clear.charts)}. Values indicate share of reference demand.</p><div class="design-foot"><span class="${errors.length?'warning':'accent'}">${errors.join(' · ')||'Design passes engineering checks'}</span>${actionBtn('Save class','save-class','','primary',!!errors.length)}</div>`)+
   panel('Class catalogue',n.blueprints.map(b=>`<div class="catalogue"><strong>${esc(b.name)}</strong><span>${esc(BUS[b.bus].name)} · ${b.design.wetMass} kg</span>${actionBtn('Load as variant','edit-class',`data-id="${b.id}"`,'quiet')}${actionBtn('Production','open-class',`data-id="${b.id}"`,'quiet')}</div>`).join(''))+'</div>';
   draw();
 }
@@ -272,8 +278,8 @@ function renderIntelligence(g,n) {
       const responseAsset=g.ownSats.some(s=>s.band===c.band && s.design.operations && !s.travel && s.disabledUntil<=g.month);
       const act=(label,id,disabled)=>actionBtn(label,'incident',`data-id="${c.id}" data-choice="${id}"`,'secondary',disabled||c.actions.includes(id));
       return `<article class="incident"><div><span class="eyebrow">${esc(c.region)} · ${c.future?'SPECULATIVE':'HISTORICAL'}</span><h3>${esc(c.name)}</h3></div><p>${esc(c.text)}</p>
-      <div class="subtle">Closes ${period(c.until)} ${c.band?'· '+BAND[c.band].name:''} ${c.source?`· <a href="${esc(c.source)}" target="_blank" rel="noopener">Historical record</a>`:''}</div>
-      <div class="button-row">${act('Negotiate','negotiate',n.cash<12)}${act('Provide services','support',n.cash<14||!Object.values(n.services).some(v=>v>=.12))}
+      ${c.type==='proxy'?`<p>Command request · ${customers[incidentCustomer[c.id]]??'Joint forces'} · monthly escalation chance ${(100*g.escalation).toFixed(1)}%. Sustained support counts throughout the crisis.</p>`:''}<div class="subtle">Closes ${period(c.until)} ${c.band?'· '+BAND[c.band].name:''} ${c.source?`· <a href="${esc(c.source)}" target="_blank" rel="noopener">Historical record</a>`:''}</div>
+      <div class="button-row">${act('Negotiate','negotiate',n.cash<12)}${act('Commit support','support',n.cash<14||!Object.values(n.services).some(v=>v>=.12))}
       ${c.band?act('Assess communications','signals',n.cash<12||!signalStrength):''}${c.asset?act(c.asset.neutralized?'Asset lost':'Destroy crisis asset','intervene',g.tension<45||n.cash<32||!responseAsset||c.asset.neutralized):''}</div>
       ${c.asset&&!c.asset.neutralized&&!responseAsset?'<small>Intervention requires a crisis response package in the objective band.</small>':''}</article>`;
     }).join('')||none('No open incidents. Check back as the campaign advances.'))+
@@ -293,6 +299,8 @@ function renderEconomy(g,n) {
     panel('Ground network',`<p>${esc(getFaction(n.id).site)} · Network level <b>${n.ground}/6</b></p>${actionBtn('Expand ground network · '+(45*n.ground)+' cr','ground','','secondary',n.ground>=6||n.cash<45*n.ground)}
     <label class="declaration">Declaration for future launches<select id="declaration">${opts(Object.fromEntries(['Civil services','Scientific mission','Strategic reserve','Undeclared'].map(s=>[s,s])),filters.declared??n.declaration)}</select></label>
     ${actionBtn('Publish declaration','declare','','secondary')}`)+
+    panel('Civilian adoption',`<p>Navigation supports transport and timing, communications supports connectivity, and mapping supports forecasting and ocean science. Adoption raises GDP gradually. The larger tax base funds later budgets.</p>
+    <div class="steward"><span>Current productivity lift</span><strong>+${(n.economicBonus*100).toFixed(2)}%</strong></div>`)+
     panel('Orbital stewardship',g.bands.map(b=>`<div class="steward"><span>${BAND[b.id].name} · ${b.annualRisk.toFixed(2)}% annual risk</span>${actionBtn('Remediate · 38 cr','remediate',`data-id="${b.id}"`,'quiet',!n.tech.includes('stewardship')||n.cash<38||b.index<=45)}</div>`).join(''))+
     panel('Strategic assessment',entries(n.score).map(([k,v])=>`<div class="steward"><span>${objectiveNames[k]}</span><strong>${num(v)}</strong></div>`).join(''))+
     (g.result?panel('Final standings',results(g.result)):'')+'</div>';
@@ -391,6 +399,7 @@ document.addEventListener('change',e=>{
   }
   if(!room?.started) return;
   const {game}=room;
+  if(id==='military-assignment') {void command({type:'assignment',id:value},'Tasking order received.');return;}
   if(id==='bus-select') {build.bus=value;build.slots=Array.from({length:BUS[value].slots},(_,i)=>build.slots[i]||null);build.active=0;renderDesign(game,game.nation);}
   if(id==='part-category') {build.category=value;renderDesign(game,game.nation);}
   if(id==='technology-branch') {filters.branch=value;renderResearch(game,game.nation);}

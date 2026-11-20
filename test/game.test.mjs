@@ -12,7 +12,7 @@ test('tech definitions form a connected set of unlockable branches',()=>{
     for(const [id] of open) visited.add(id);
   }
   assert.equal(BRANCHES.length,6);
-  assert.equal(visited.size,38);
+  assert.equal(visited.size,45);
 });
 test('invalid spacecraft and invalid budget changes do not mutate the programme',()=>{
   const game=newGame();
@@ -76,6 +76,7 @@ test('a regional incident can cause general war, shared losses and enduring repl
   const game=newGame(10);
   game.month=(2038-1975)*12+8;
   game.tension=75;
+  game.seed=1972; // A low first random draw exercises the escalation branch.
   for(const nation of [game.nations.us,game.nations.su]) {
     nation.tech.push('response');
     nation.services.comm=.75;

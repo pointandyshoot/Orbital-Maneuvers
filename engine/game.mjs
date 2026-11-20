@@ -1,3 +1,4 @@
+import { customers, incidentCustomer, assessFleet, payloadProfile, escalationChance } from './missions.mjs';
 import { BANDS, BAND, BUS, END, FACTIONS, MONTHS, PARTS, POLICIES, ROCKETS, SOURCE_LINKS, SPEEDS, START, TECH, YEAR_SECONDS } from './content.mjs';
 import { INCIDENTS } from './history.mjs';
 import { orbitFor, phasing, remainingDeltaV, risk, transfer, transitPath } from './orbit.mjs';
@@ -24,7 +25,7 @@ function log(game,title,body,audience=null,kind='info') {
   if (game.events.length>360) game.events.splice(0,game.events.length-360);
 }
 function score(nation,key,points) {
-  nation.score[key] = Math.max(0,nation.score[key]+points);
+  nation.score[key] = Math.max(0,(nation.score[key]??0)+points);
 }
 const tally = nation => Math.max(0, Math.round(values(nation.score).reduce((a,b)=>a+b,0)));
 
@@ -53,6 +54,7 @@ export function inspectDesign(nation,busId,parts) {
   design.wetMass=design.dryMass+(design.isp?design.fuel:0);
   design.shield=Math.min(.83,design.shield);
   design.cost=Math.ceil(design.cost*(has(nation,'solar')?.93:1)*(has(nation,'manufacture')?.84:1)*(has(nation,'foundry')?.8:1));
+  design.payload=payloadProfile(parts);
   design.errors=[];
   if (design.power<0) design.errors.push('Power deficit');
   if (design.heat<0) design.errors.push('Heat rejection deficit');
@@ -85,10 +87,11 @@ export function newGame(seed=1975) {
       budget:16,policy:'balanced',declaration:'Civil services',tech:[...def.start],research:[],blueprints:[],
       production:[],stock:{},launches:[],doctrines:[],launchSerial:1,ground:1,contacts:{},maintenance:0,
       services:{comm:0,imaging:0,nav:0},resilience:0,industryPause:0,
-      score:{services:0,economy:0,intelligence:0,operations:0,resilience:0,stewardship:0}};
+      score:{readiness:0,campaigns:0,intelligence:0,operations:0,resilience:0,stewardship:0}};
     game.nations[nation.id]=nation;
     const comm=blueprint(game,nation,'Pathfinder relay','scout',['radio','motor']);
-    const observe=blueprint(game,nation,'Surveyor','scout',['camera','motor']);
+    const observe=nation.id==='su'?blueprint(game,nation,'Ocean survey platform','scout',['radar','reactor','radiator','radiator']):
+      blueprint(game,nation,'Surveyor','scout',['camera','motor']);
     nation.stock[observe.id]=1;
     place(game,nation,comm,'lower');
     place(game,nation,observe,'polar');
@@ -252,6 +255,10 @@ export function order(game,nationId,action) {
       nation.declaration=action.id;
       break;
     }
+    case 'assignment':
+      requireRule(action.id==='balanced'||Object.hasOwn(customers,action.id),'Unknown customer.');
+      nation.assignment=action.id;
+      break;
     case 'ground': {
       requireRule(nation.ground<6,'The ground network is fully developed.');
       spend(nation,45*nation.ground);
@@ -291,9 +298,11 @@ function respond(game,nation,action) {
       score(nation,'stewardship',6);
       break;
     case 'support':
-      requireRule(values(nation.services).some(x=>x>=.12),'A working civilian service is required.');
+      requireRule(values(nation.services).some(x=>x>=.12),'A working space service is required.');
       spend(nation,14);
-      score(nation,'services',12+Math.round(values(nation.services).reduce((a,b)=>a+b,0)*8));
+      crisis.committed??={};
+      crisis.committed[nation.id]=true;
+      if(crisis.type!=='proxy') game.tension=clamp(game.tension-2,0,100);
       break;
     case 'signals': {
       const capacity=active.reduce((a,s)=>a+s.design.intel*s.condition,0);
@@ -314,7 +323,7 @@ function respond(game,nation,action) {
       crisis.asset.neutralizedBy=nation.id;
       game.debris[crisis.band]+=350;
       game.tension=clamp(game.tension+13,0,100);
-      score(nation,'operations',170);
+      score(nation,'operations',30);
       log(game,'Incident asset destroyed','The designated uncrewed asset was lost. Debris is spreading through '+BAND[crisis.band].name+'.',null,'alert');
       break;
     }
@@ -339,19 +348,22 @@ function updateServices(game,nation) {
   const demand=38+game.month*.032;
   for (const k of keys(pressure)) nation.services[k]=Math.min(1,(1-Math.exp(-pressure[k]/demand))*(.68+.32*Math.min(1,ground/(9+pressure[k]*.22))));
   nation.resilience=keys(counts).reduce((sum,k)=>sum+Math.min(1,Math.max(0,counts[k]-1)/3)*nation.services[k],0)/3;
+  const cloudy=game.crises.some(c=>c.type==='proxy')?.72:.36;
+  nation.missions=assessFleet(nation,fleet,cloudy,Boolean(game.war||game.crises.some(c=>c.type==='proxy')));
+  nation.chartArchive=Math.max((nation.chartArchive??0)*.998,nation.missions.charts*.94);
   nation.maintenance=round(fleet.reduce((sum,s)=>sum+.23+(s.design.wetMass/1700),0));
 }
 function updateEconomy(game,nation) {
   const policy=POLICIES[nation.policy];
   const services=nation.services;
-  const gain=(services.comm*.43+services.imaging*(has(nation,'forecasting')?.40:.32)+services.nav*.25)*policy.growth;
-  nation.economicBonus += (gain*.115-nation.economicBonus)*.039;
+  const gain=(services.comm*.43+nation.missions.imagery*(has(nation,'forecasting')?.31:.23)+nation.missions.charts*.09+nation.missions.nav*.25)*policy.growth;
+  nation.economicBonus += (gain*.115-nation.economicBonus)*.016;
   nation.gdp=round(nation.baseGdp*Math.pow(1.015,game.month/12)*(1+nation.economicBonus),0);
-  const income=8.8+Math.sqrt(nation.gdp)*.12+gain*4.5;
+  const income=8.8+Math.sqrt(nation.gdp)*.16;
   const crisisDrag=game.war ? 5 : 0;
   nation.cash=clamp(round(nation.cash+income*policy.funding-nation.maintenance-nation.budget*.08-crisisDrag),0,900);
-  score(nation,'services',(services.comm+services.imaging+services.nav)*.22);
-  score(nation,'economy',nation.economicBonus*5.5);
+  const readiness=values(nation.missions.readiness);
+  score(nation,'readiness',readiness.reduce((a,b)=>a+b,0)*.22);
   score(nation,'resilience',nation.resilience*(game.war?1.5:.23));
 }
 function runQueues(game,nation) {
@@ -490,19 +502,40 @@ function historicalEvents(game) {
     game.nations.eu.name='European Union';
     log(game,'European integration','The European programme gains a common political framework.',null,'history');
   }
+  for(const c of game.crises) if(c.type==='proxy' && c.until===game.month) resolveConflict(game,c.id,c.name);
   game.crises=game.crises.filter(c=>c.until>game.month);
 }
+function recordContribution(game,nation) {
+  const assessments=game.assessments??={};
+  const crises=game.crises.filter(c=>c.type==='proxy');
+  const objectives=game.war?[...crises,{id:'general'}]:crises;
+  for(const crisis of objectives){
+    const customer=incidentCustomer[crisis.id];
+    const ratings=nation.missions.readiness;
+    const value=customer?ratings[customer]:values(ratings).reduce((a,b)=>a+b,0)/4;
+    const ledger=assessments[crisis.id]??={};
+    const row=ledger[nation.id]??={sum:0,months:0};
+    row.sum+=Math.min(1,value*(crisis.committed?.[nation.id]?1.25:1));
+    row.months++;
+  }
+}
+function resolveConflict(game,id,title) {
+  const ledger=game.assessments?.[id];
+  if(!ledger) return;
+  const averages=values(ledger).map(row=>row.sum/row.months);
+  const benchmark=.10+.42*Math.max(...averages)+.08*random(game);
+  for(const [key,row] of Object.entries(ledger)){
+    const nation=game.nations[key], contribution=row.sum/row.months;
+    const success=contribution>=benchmark;
+    score(nation,'campaigns',(id==='general'?570:205)*contribution*(success?1.35:.75));
+    if(!success) nation.baseGdp*=id==='general'?.94:.984;
+    log(game,title+' assessment',Math.round(contribution*100)+'% of command demand served. '+(success?'Mission objectives met.':'Command fell short; economic capacity fell '+(id==='general'?'6':'1.6')+'%.'),key,'history');
+  }
+  delete game.assessments[id];
+}
 function warStep(game) {
-  const military=values(game.nations).filter(n=>has(n,'response')).length;
-  const dependent=values(game.nations).filter(n=>n.services.comm+n.services.nav>.68).length;
-  if (!game.war && year(game)>=2034 && game.month%2===0 && military>=2 && dependent>=2 &&
-      game.crises.some(c=>c.type==='proxy' && c.future && c.asset)) {
-    game.tension=clamp(game.tension+4.4,0,100);
-  }
-  if (!game.war && game.tension>=66 && game.tension<74 && game.month%6===0) {
-    log(game,'Major escalation warning','Orbital crises now threaten multiple infrastructure-dependent powers. Negotiations can still lower tensions.',null,'alert');
-  }
-  if (!game.war && year(game)>=2034 && game.month-game.lastWar>180 && military>=2 && dependent>=2 && game.tension>=77) {
+  const chance=escalationChance(game);
+  if(chance && random(game)<chance) {
     game.war={start:game.month,until:game.month+18};
     for (const band of BANDS) game.debris[band.id]+=[930,1600,1900,1120,940][BANDS.indexOf(band)];
     for (const nation of values(game.nations)) {
@@ -520,6 +553,7 @@ function warStep(game) {
     log(game,'General orbital war','Programmes across Earth suffer fleet losses, launch stand-downs and shared debris. Surviving services are now critical.',null,'alert');
   }
   if (game.war && game.month>=game.war.until) {
+    resolveConflict(game,'general','General war');
     game.war=null;
     game.lastWar=game.month;
     game.tension=39;
@@ -537,7 +571,7 @@ function ai(game,nation,index) {
   const tryOrder = action=>{try { order(game,nation.id,action); return true; } catch { return false; }};
   const priority=[
     ['broadcast','timing','modular','arrays','wideband','quality','manufacture','analysis','tracking','signals','response'],
-    ['tracking','signals','analysis','precision','response','modular','quality','manufacture','lift','assurance','shield'],
+    ['tracking','signals','analysis','precision','altimetry','response','modular','quality','manufacture','lift','assurance','shield'],
     ['modular','quality','manufacture','tracking','assurance','arrays','timing','shield','precision','servicing','green','harden','stewardship'],
     ['quality','modular','manufacture','solar','arrays','optical','radar','timing','lift','tracking','signals','analysis','response']
   ][index];
@@ -549,12 +583,14 @@ function ai(game,nation,index) {
   const fleet=game.satellites.filter(s=>s.owner===nation.id);
   const activeCrisis=game.crises.find(c=>c.type==='proxy' && c.asset && c.until>game.month);
   if (activeCrisis) {
+    nation.assignment=incidentCustomer[activeCrisis.id]??'balanced';
     if (index===2) tryOrder({type:'incident',choice:'negotiate',crisis:activeCrisis.id});
     else if (index!==0 && game.tension>=45) tryOrder({type:'incident',choice:'intervene',crisis:activeCrisis.id});
     else if (index===0 && (!has(nation,'response') || game.tension<44)) tryOrder({type:'incident',choice:'negotiate',crisis:activeCrisis.id});
     if (index!==2) tryOrder({type:'incident',choice:'signals',crisis:activeCrisis.id});
     tryOrder({type:'incident',choice:'support',crisis:activeCrisis.id});
   }
+  if(!activeCrisis) nation.assignment='balanced';
   if (nation.cash<55 || fleet.length+nation.launches.length>13) return;
   const best=[
     {kind:'comm',band:has(nation,'lift')?'geo':'lower',part:has(nation,'wideband')?'relay':has(nation,'broadcast')?'dish':'radio'},
@@ -566,7 +602,10 @@ function ai(game,nation,index) {
   const response=has(nation,'response') && strategicBand && !fleet.some(s=>s.design.operations && s.band===strategicBand);
   if (response) best.band=strategicBand;
   const intel=has(nation,'signals') && !fleet.some(s=>s.design.intel);
-  const parts=[response?'response':intel?'receiver':best.part,has(nation,'arrays')?'arrays':'panel','radiator','motor'];
+  if(nation.id==='su' && !fleet.some(s=>s.design.payload?.chart) && has(nation,'altimetry')) {
+    best.part='altimeter';best.band='polar';
+  }
+  const parts=[response?'response':intel?'receiver':best.part,has(nation,'film')?'film':has(nation,'junction')?'junction':has(nation,'arrays')?'arrays':has(nation,'mono')?'mono':'panel','radiator','motor'];
   const bus=has(nation,'modular')?'relay':'scout';
   const designName=PARTS[parts[0]].name+' '+bus;
   let bp=nation.blueprints.find(b=>b.name===designName);
@@ -591,13 +630,15 @@ export function advance(game,aiFactions=[]) {
     runQueues(game,nation);
     if (game.month%2===0 && game.month<MONTHS) replenish(game,nation);
     updateServices(game,nation);
+    recordContribution(game,nation);
     updateEconomy(game,nation);
     if (game.month%2===0) updateContacts(game,nation);
   }
   for (const [i,def] of FACTIONS.entries()) if (aiFactions.includes(def.id)) ai(game,game.nations[def.id],i);
   if (game.month===MONTHS) {
+    for(const key of keys(game.assessments??{})) resolveConflict(game,key,'Closing campaign');
     for (const nation of values(game.nations)) {
-      score(nation,'resilience',150*nation.resilience+26*values(nation.services).reduce((a,b)=>a+b,0));
+      score(nation,'resilience',150*nation.resilience);
     }
     log(game,'Campaign complete','The '+END+' assessment is now available to all participants.',null,'history');
   }
@@ -610,13 +651,13 @@ export function factionView(game,nationId) {
   const elapsedSeconds=game.month*YEAR_SECONDS/12;
   const result=game.month===MONTHS?values(game.nations).map(n=>({id:n.id,name:n.name,total:tally(n),score:n.score})).sort((a,b)=>b.total-a.total):null;
   return {
-    month:game.month,year:year(game),elapsedSeconds,phase:game.phase,tension:round(game.tension),finish:END,
+    month:game.month,year:year(game),elapsedSeconds,phase:game.phase,escalation:escalationChance(game),tension:round(game.tension),finish:END,
     groundReview:nation.industryPause>game.month, nation:{...nation,contacts:undefined}, ownSats,
     contacts:values(nation.contacts).filter(c=>c.last>=game.month-12).map(c=>({...c,reviewed:undefined})),
     bands:BANDS.map(b=>({id:b.id,index:round(game.debris[b.id]),annualRisk:round(100*risk(b,game.debris[b.id],1),2)})),
     factions:values(game.nations).map(n=>({id:n.id,name:n.name})),
     events:game.events.filter(e=>!e.audience || e.audience===nationId).slice(-65),
-    crises:game.crises.map(c=>({...c,source:SOURCE_LINKS[c.source],actions:c.actions[nationId]||[]})),
+    crises:game.crises.map(c=>({...c,source:SOURCE_LINKS[c.source],committed:undefined,actions:c.actions[nationId]||[]})),
     ownScore:tally(nation), result
   };
 }

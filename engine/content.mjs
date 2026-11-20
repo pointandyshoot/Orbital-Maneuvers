@@ -7,7 +7,7 @@ export const MU = 3.986004418e14;
 export const SPEEDS = [0, 1, 2, 4];
 export const FACTIONS = [
   { id:'us', name:'United States', short:'USA', color:'#65daf7', gdp:1690, cash:310, site:'Cape Canaveral', lat:28.5, lon:-80.6, start:['broadcast','precision'] },
-  { id:'su', name:'Soviet Union', short:'USSR', color:'#ff927e', gdp:1180, cash:290, site:'Baikonur', lat:45.6, lon:63.3, start:['optical','lift'] },
+  { id:'su', name:'Soviet Union', short:'USSR', color:'#ff927e', gdp:1180, cash:290, site:'Baikonur', lat:45.6, lon:63.3, start:['optical','lift','reactor','radar'] },
   { id:'eu', name:'Europe', short:'EUR', color:'#e2cf83', gdp:1390, cash:275, site:'Guiana', lat:5.2, lon:-52.8, start:['broadcast','solar'] },
   { id:'cn', name:'China', short:'CHN', color:'#bdabff', gdp:470, cash:260, site:'Jiuquan', lat:41, lon:100.3, start:['optical','solar'] }
 ];
@@ -31,6 +31,13 @@ function part(name, kind, mass, power, heat, cost, properties = {}) {
   return {name,kind,mass,power,heat,cost,...properties};
 }
 export const PARTS = {
+  detail:part('Narrow-field survey camera','imaging',95,-39,-24,32,{output:22,tech:'detail'}),
+  mono:part('Monocrystalline array','power',30,85,0,18,{tech:'mono'}),
+  junction:part('Multijunction array','power',37,176,0,32,{tech:'junction'}),
+  film:part('Speculative tandem blanket','power',26,194,0,47,{tech:'film'}),
+  reactor:part('Fission power module','power',180,155,-18,69,{tech:'reactor'}),
+  altimeter:part('Ocean altimeter','imaging',66,-32,-19,29,{output:10,tech:'altimetry'}),
+  processor:part('Onboard image processor','support',35,-20,-14,31,{tech:'edge'}),
   radio:part('VHF relay','comm',46,-24,-14,12,{output:12}),
   camera:part('Survey camera','imaging',67,-27,-16,15,{output:13}),
   panel:part('Solar array','power',34,67,0,13),
@@ -60,6 +67,13 @@ export const PARTS = {
 };
 function tech(name, branch, months, cost, req, text) { return {name,branch,months,cost,req,text}; }
 export const TECH = {
+  detail:tech('Fine-detail survey optics','Observation & intelligence',18,56,['optical'],'Fit narrower optics for detailed surveys. Less area is revisited per pass.'),
+  mono:tech('Monocrystalline arrays','Spacecraft systems',14,42,['solar'],'Fit a lighter array with 85 power versus 67 on the standard panel.'),
+  junction:tech('Multijunction cells','Spacecraft systems',27,90,['arrays','mono'],'Fit a 176-power wing at 37 kg.'),
+  film:tech('Lightweight tandem blankets','Spacecraft systems',36,148,['junction','thermal'],'Speculative lightweight 194-power blanket; expensive manufacture.'),
+  reactor:tech('Orbital fission power','Spacecraft systems',34,130,['thermal'],'Continuous observation power through eclipse; high mass, cost and heat load.'),
+  altimetry:tech('Ocean surface altimetry','Observation & intelligence',20,64,['precision'],'Map broad seafloor features indirectly. Supports naval charts and ocean science.'),
+  edge:tech('Onboard image selection','Observation & intelligence',26,86,['optical','analysis'],'Fit a processor to return useful observations sooner.'),
   lift:tech('Heavy lift','Launch & industry',19,55,[],'Unlocks the Titan-class lifter.'),
   quality:tech('Quality assurance','Launch & industry',15,43,[],'Improves launch reliability and manufacturing yield.'),
   modular:tech('Modular structures','Spacecraft systems',16,54,[],'Unlocks the six-slot Relay bus.'),
@@ -75,9 +89,9 @@ export const TECH = {
   cadence:tech('Launch standardisation','Launch & industry',23,66,['quality'],'Reduces launch preparation by one month.'),
   manufacture:tech('Modular manufacturing','Launch & industry',24,74,['quality','modular'],'Adds a production line and reduces unit costs.'),
   shield:tech('Debris shielding','Security & resilience',20,58,['modular'],'Unlocks the shield package.'),
-  electric:tech('Electric propulsion','Orbital mobility',26,89,['precision','arrays'],'Unlocks the electric thruster. Efficient, with slower transfers.'),
+  electric:tech('Electric propulsion','Orbital mobility',26,89,['precision','thermal'],'Unlocks the electric thruster. Efficient, with slower transfers.'),
   atomic:tech('Orbital atomic clocks','Communications & timing',27,89,['timing','arrays'],'Unlocks the atomic timing package.'),
-  radar:tech('Spaceborne radar','Observation & intelligence',24,83,['optical','arrays'],'Unlocks the all-weather mapper.'),
+  radar:tech('Spaceborne radar','Observation & intelligence',24,83,['tracking'],'Unlocks the all-weather mapper.'),
   wideband:tech('Digital wideband relay','Communications & timing',24,83,['broadcast','arrays'],'Unlocks the high-capacity relay.'),
   heavybus:tech('Large orbital platforms','Spacecraft systems',29,98,['thermal','lift'],'Unlocks the eight-slot Platform bus.'),
   analysis:tech('Spectrum analysis','Observation & intelligence',23,80,['signals','tracking'],'Unlocks the spectrum analyst.'),

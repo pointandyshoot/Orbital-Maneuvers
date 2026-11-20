@@ -12,6 +12,7 @@ const STATIC = new Map([
   ['/app.mjs',['public/app.mjs','text/javascript; charset=utf-8']],
   ['/map.mjs',['public/map.mjs','text/javascript; charset=utf-8']],
   ['/coastlines.json',['public/coastlines.json','application/json']],
+  ['/engine/missions.mjs',['engine/missions.mjs','text/javascript; charset=utf-8']],
   ['/engine/content.mjs',['engine/content.mjs','text/javascript; charset=utf-8']],
   ['/engine/orbit.mjs',['engine/orbit.mjs','text/javascript; charset=utf-8']]
 ]);

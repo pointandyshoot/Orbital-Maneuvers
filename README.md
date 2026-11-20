@@ -27,9 +27,9 @@ The server saves each room and its pending game orders under `data/`, or under t
 - **Command** shows ground tracks, approximate instantaneous coverage, fleet condition, orbital hazards and global tension. Select a spacecraft to estimate transfers or adjust its orbital spacing.
 - **Spacecraft** assembles a reusable class from researched buses and modules. Drag equipment onto the blueprint slots or click the module after selecting a slot. Extra power, heat rejection, propellant and launch capacity compete for mass.
 - **Production & launch** handles manufacture, stock, launch queues and standing replenishment orders. Different orbits suit different services. Maintain backups before the initial fleet reaches retirement.
-- **Research** has 38 technologies across six branches, with cross-branch prerequisites and catch-up for projects demonstrated elsewhere. **Economy** controls programme funding, the ground network and debris remediation.
+- **Research** has 45 technologies across six branches, with cross-branch prerequisites and catch-up for projects demonstrated elsewhere. **Economy** controls programme funding, the ground network and debris remediation.
 - **Intelligence & events** exposes estimates rather than rival build details. Incidents provide opportunities to negotiate, deliver services, gather intelligence, or act against designated fictional crisis assets.
-- **Final assessment** combines delivered services, space-driven economic gains, crisis actions, resilience and stewardship. General orbital war depends on tension, capabilities and reliance on space services. The aftermath can close some orbits to new launches for years.
+- **Final assessment** rewards military readiness, conflict contribution, intelligence, operations, resilience and stewardship. Civilian adoption gradually increases GDP and future budgets. During proxy crises the server rolls for escalation each month. Aggression raises risk while defensive capacity, redundancy and negotiations lower it. The aftermath can close some orbits to new launches for years.
 
 ## Simulation and sources
 
@@ -42,6 +42,18 @@ Historical events include Apollo–Soyuz, Helsinki, Afghanistan, Challenger, the
 - [Natural Earth 1:110m coastlines](https://www.naturalearthdata.com/downloads/110m-physical-vectors/110m-coastline/), distributed as [public-domain data](https://www.naturalearthdata.com/about/terms-of-use/)
 
 The design is Earth-focused. A later Moon expansion could introduce a competing use for launch capacity through relay coverage, science, and logistics for sustained surface operations. Its economic importance would depend on actual demand, transport cost and how much infrastructure each faction can keep operating.
+
+## Military demand and design assumptions
+
+The four commands compete for finite tasking capacity. The command screen shows the resulting readiness, and each proxy incident names its priority customer. Conflict assessments average support over the incident. A shortfall reduces economic capacity while the campaign continues. Existing saves retain previously earned points.
+
+Observation uses relative instrument detail, cloud, duty cycle, onboard image selection and a spacing-based revisit proxy. The diminishing-return curves and command weights are balancing assumptions. Deep-ocean charting represents indirect inference from surface altimetry. Hardware changes require new builds. The late-game tandem blanket and wide deployment of resilient onboard routing are speculative.
+
+- [NOAA on indirect ocean mapping](https://oceanservice.noaa.gov/facts/satellites-ocean.html)
+- [NASA SWOT handbook on radar and optical measurements](https://earthdata.nasa.gov/s3fs-public/2024-06/D-109532_SWOT_UserHandbook_20240502.pdf)
+- [GPS economic benefits study](https://www.gps.gov/sites/default/files/2025-07/gps_finalreport618.pdf)
+- [ESA onboard image selection](https://philab.esa.int/flagship-programmes/phi-sats-programme/) and [research into optical network resilience](https://resilience.esa.int/archives/projects/ot4ngsat)
+- [Historical Soviet reactor-powered radar spacecraft](https://www.archives.gov/files/declassification/iscap/pdf/2012-151-doc01-03.pdf)
 
 ## Test
 
